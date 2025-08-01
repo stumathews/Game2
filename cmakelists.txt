@@ -20,11 +20,11 @@ find_package(SDL2_image REQUIRED)
 
 add_executable(testLinking main.cpp)
 
-target_link_libraries(testLinking PUBLIC SDL2::SDL2 
+target_link_libraries(testLinking PUBLIC SDL2::SDL2main
 SDL2_ttf::SDL2_ttf
 SDL2_mixer::SDL2_mixer
 SDL2_image::SDL2_image
-unofficial-sodium::sodium winmm PRIVATE cppgamelib::cppgamelib)
+unofficial-sodium::sodium winmm PRIVATE cppgamelib::cppgamelib wsock32 ws2_32)
 
 # Copy test files in the output folder of the testLinking target
 add_custom_command(
