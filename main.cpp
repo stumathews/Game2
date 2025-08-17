@@ -1,13 +1,17 @@
-#include "SDL.h"
+//#include "SDL.h"
 #include <vector>
 #include <cppgamelib\file\Logger.h>
 #include <cppgamelib\file\SettingsManager.h>
-#include <iostream>
-#include <cppgamelib/file/TextFile.h>
-#include <cppgamelib/structure/GameStructure.h>
-#include <cppgamelib/structure/FixedStepGameLoop.h>
-#include <direct.h> // Add this at the top for _getcwd
+#include <cppgamelib\file/TextFile.h>
+#include <cppgamelib\structure/GameStructure.h>
+#include <cppgamelib\structure/FixedStepGameLoop.h>
 #include <cppgamelib/objects/GameWorldData.h>
+#include <direct.h>
+#include <iostream>
+#include <testlib/messages.h>
+#include <mazer/Enemy.h>
+#include <mazer/Room.h>
+
 using namespace std;
 
 int main(int argc, char* argv[])
@@ -50,6 +54,14 @@ int main(int argc, char* argv[])
 	gamelib::TextFile textFile("info.log");
 	textFile.Append("This is a test log entry.");
 	textFile.Flush();
+
+	// Use testlib to test messages
+	test::Messages messages;
+	messages.SaySomething2();
+
+	// Use mazer to create a room
+	mazer::Room room("toom1", "", 12, 12, 12, 12, 12);
+	cout << "Room name: " << room.GetName() << "\n";
 	
 	// 60 FPS
 	auto fixedStepGameLoop = std::make_shared<gamelib::FixedStepGameLoop>(60,
@@ -74,7 +86,11 @@ int main(int argc, char* argv[])
 	gamelib::GameWorldData gameWorldData;
 	gameStructure.DoGameLoop(&gameWorldData);
 
+
+
 	gameStructure.Unload();
+
+	
 
 	return 0;
 }

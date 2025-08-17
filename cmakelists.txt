@@ -9,22 +9,34 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Restrict to debug and release builds not things like MinSizeRel and RelWithDebInfo
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
 
+find_package(SDL2 CONFIG REQUIRED)
+find_package(testlib REQUIRED)
 find_package(cppgamelib CONFIG REQUIRED)
 find_package(unofficial-sodium CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
-find_package(SDL2 CONFIG REQUIRED)
 find_package(SDL2_ttf REQUIRED)
 find_package(SDL2_ttf CONFIG REQUIRED)
 find_package(SDL2_mixer REQUIRED)
 find_package(SDL2_image REQUIRED)
+find_package(mazer REQUIRED)
 
 add_executable(testLinking main.cpp)
 
-target_link_libraries(testLinking PUBLIC SDL2::SDL2main
+target_link_libraries(testLinking 
+PUBLIC 
+SDL2::SDL2main
 SDL2_ttf::SDL2_ttf
 SDL2_mixer::SDL2_mixer
 SDL2_image::SDL2_image
-unofficial-sodium::sodium winmm PRIVATE cppgamelib::cppgamelib wsock32 ws2_32)
+unofficial-sodium::sodium 
+winmm 
+PRIVATE 
+cppgamelib::cppgamelib 
+mazer::mazer
+wsock32 
+ws2_32
+testlib::testlib 
+)
 
 # Copy test files in the output folder of the testLinking target
 add_custom_command(

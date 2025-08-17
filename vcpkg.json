@@ -2,6 +2,8 @@
   "dependencies": [
     "libmonad",
     "cppgamelib",
+    "testlib",
+    "mazer",
     "libsodium",
     "gtest",
     "sdl2",
