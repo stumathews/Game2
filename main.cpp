@@ -7,90 +7,218 @@
 #include <cppgamelib\structure/FixedStepGameLoop.h>
 #include <cppgamelib/objects/GameWorldData.h>
 #include <direct.h>
+#include <GameData.h>
+#include <GameDataManager.h>
 #include <iostream>
+#include <common/Common.h>
+#include <events/AddGameObjectToCurrentSceneEvent.h>
+#include <events/PlayerMovedEvent.h>
+#include <events/UpdateProcessesEvent.h>
+#include <Logging/ErrorLogManager.h>
 #include <testlib/messages.h>
 #include <mazer/Enemy.h>
 #include <mazer/Room.h>
+#include <net/NetworkManager.h>
+#include <scene/SceneManager.h>
+#include <cppgamelib/events/AddGameObjectToCurrentSceneEvent.h>
+#include <cppgamelib/events/UpdateAllGameObjectsEvent.h>
+#include <direct.h>
+
+#include "LevelManager.h"
+#include <mazer/EnemyMovedEvent.h>
 
 using namespace std;
 
-int main(int argc, char* argv[])
+using namespace std;
+using namespace gamelib;
+
+typedef SettingsManager Settings;
+
+namespace
 {
-	std::cout << "Starting test exe.\n";
+	/*
+		##   ##    ##     ### ##   ### ###  ### ##            ## ##    ### ##
+		## ##      ##    ##  ##    ##  ##   ##  ##           ##  ##    ##  ##
+		# ### #   ## ##      ##     ##       ##  ##               ##    ##  ##
+		## # ##   ##  ##    ##      ## ##    ## ##               ##     ##  ##
+		##   ##   ## ###   ##       ##       ## ##              ##      ##  ##
+		##   ##   ##  ##  ##  ##    ##  ##   ##  ##            #   ##   ##  ##
+		##   ##  ###  ##  # ####   ### ###  #### ##           ######   ### ##
+	*/
 
-	gamelib::Logger::Get()->LogThis("Help!");
+	static void InitializeGameSubSystems(GameStructure& gameStructure);
+	static void PrepareFirstLevel();
+	static shared_ptr<FixedStepGameLoop> CreateGameLoopStrategy();
+	static void GetInput(unsigned long deltaMs);
+	static void SetupEventTap();
 
-	auto ok = gamelib::SettingsManager::Get()->ReadSettingsFile("settings.xml");
-
-	if (!ok)
+	void PrepareFirstLevel()
 	{
+		const auto isSinglePlayerGame = mazer::GameData::Get()->IsSinglePlayerGame();
 
-            char cwd[1024];
-            if (_getcwd(cwd, sizeof(cwd)) != nullptr)
-            {
-                std::cout << "Current working directory: " << cwd << "\n";
-            }
-            else
-            {
-                std::cout << "Failed to get current working directory.\n";
-            }
-		std::cout << "Could not read settings.xml file.\n";
-		return 1;
+		if (isSinglePlayerGame)
+		{
+			auto _ = LevelManager::Get()->ChangeLevel(1);
+
+			if (Settings::Bool("global", "createAutoLevel"))
+			{
+				LevelManager::Get()->CreateAutoLevel();
+			}
+			else
+			{
+				// Get the name of the level file for the first level
+				const auto firstLevelFilePath = Settings::String("global", "level1FileName");
+
+				LevelManager::Get()->CreateLevel(firstLevelFilePath);
+			}
+		}
+
+		Logger::Get()->LogThis(!isSinglePlayerGame
+			? NetworkManager::Get()->IsGameServer()
+			? "Waiting for network players. Press 'n' to start network game."
+			: "Waiting for the server to start the network game to begin."
+			: "Creating Single player level...");
 	}
 
-	/*
-	 <audio>
-                <setting name="invalid_move" type="string">low.wav</setting>
-                <setting name="fetched_pickup" type="string">boop.wav</setting>
-                <setting name="win_music" type="string">win.wav</setting>
-        </audio>
-	*/
-    // Use cppgamelib to read settings from xml file
-	std::cout << "The win music is: " << gamelib::SettingsManager::Get()->GetString("audio","win_music") << "\n";
-	std::cout << "The fetched pickup music is: " << gamelib::SettingsManager::Get()->GetString("audio","fetched_pickup") << "\n";
-	std::cout << "The invalid move music is: " << gamelib::SettingsManager::Get()->GetString("audio","invalid_move") << "\n";
+	void InitializeGameSubSystems(GameStructure& gameStructure)
+	{
+		constexpr auto screenWidth = 0; // 0 will mean it will get read from the settings file
+		constexpr auto screenHeight = 0; // 0 will mean it will get read from the settings file
+		constexpr auto windowTitle = "Mazer2D!";
+		constexpr auto resourcesFilePath = "data\\Resources.xml";
+		constexpr auto sceneFolderPath = "data\\";
 
-	// Use cppgamelib to read a text file
-	gamelib::TextFile textFile("info.log");
-	textFile.Append("This is a test log entry.");
-	textFile.Flush();
+		// Initialize network subsystem
+		const auto isNetworkGame = SettingsManager::Get()->GetBool("global", "isNetworkGame");
+		mazer::GameDataManager::Get()->Initialize(isNetworkGame);
 
-	// Use testlib to test messages
-	test::Messages messages;
-	messages.SaySomething2();
+		// Initialize the logging system
+		ErrorLogManager::GetErrorLogManager()->Create("GameErrors.txt");
 
-	// Use mazer to create a room
-	mazer::Room room("toom1", "", 12, 12, 12, 12, 12);
-	cout << "Room name: " << room.GetName() << "\n";
-	
-	// 60 FPS
-	auto fixedStepGameLoop = std::make_shared<gamelib::FixedStepGameLoop>(60,
-		[](unsigned long deltaMs) 
+		// Initialize game structure
+		const auto isGameStructureInitialized = gameStructure.Initialize(
+			screenWidth, screenHeight, windowTitle, resourcesFilePath,
+			sceneFolderPath);
+
+		// Initialize level manager
+		const auto isLevelManagerInitialized = LevelManager::Get()->Initialize();
+
+		const auto anyInitFailures = !IsSuccess(isGameStructureInitialized, "Successfully initialized game structure.") ||
+			!IsSuccess(isLevelManagerInitialized, "Successfully initialized Level Manager...");
+
+		// Check for any initialization failures
+		if (anyInitFailures)
 		{
-			// Update function 
-			std::cout << "u. " << deltaMs << " ms\n";
-		},
-		[]() 
+			const auto verboseLoggingEnabled = Settings::Bool("global", "verbose");
+
+			LogMessage("Game subsystem initialization failed.", verboseLoggingEnabled, true);
+
+			THROW(12, "There was a problem initializing the game subsystems", "Initialize Subsystems");
+		}
+	}
+
+	static void Update(const unsigned long deltaMs)
+	{
+		// Process all pending events
+		EventManager::Get()->ProcessAllEvents(deltaMs);
+
+		// Send update event - will dispatch events to subscribers who have subscribed to game object 'update' event 
+		EventManager::Get()->DispatchEventToSubscriber(EventFactory::Get()->CreateUpdateAllGameObjectsEvent(), deltaMs);
+
+		// Send update processes event - will dispatch event to processes
+		EventManager::Get()->DispatchEventToSubscriber(EventFactory::Get()->CreateUpdateProcessesEvent(), deltaMs);
+	}
+
+	static void Draw()
+	{
+		// Time-sensitive, skip queue. Draws the current scene
+		EventManager::Get()->DispatchEventToSubscriber(EventFactory::Get()->CreateGenericEvent(DrawCurrentSceneEventId, "Game"), 0UL);
+	}
+
+	void GetInput(const unsigned long deltaMs)
+	{
+		LevelManager::Get()->GetInputManager()->Sample(deltaMs);
+		NetworkManager::Get()->Listen(mazer::GameDataManager::Get()->GameWorldData.ElapsedGameTime);
+	}
+
+	shared_ptr<FixedStepGameLoop> CreateGameLoopStrategy()
+	{
+		return std::make_shared<FixedStepGameLoop>(16, Update, Draw, GetInput);
+	}
+
+	void SetupEventTap()
+	{
+		// Register a Window to show causal relationships and events
+		//auto toolWindow = libcausality::ToolWindow("ToolWindow1", 340,340, "This is a Tool Window Title");
+
+		// Tap into the fetchPickupEvent to track relationships between player and pickups
+		EventManager::Get()->SetEventTap([](const shared_ptr<Event>& event, const IEventSubscriber* subscriber)
+			{
+				// Ignore tapping some events:
+				if (event->Id == PlayerMovedEventTypeEventId) return;
+				if (event->Id == AddGameObjectToCurrentSceneEventId) return;
+				if (event->Id == mazer::EnemyMovedEventId) return;
+				if (event->Id == DrawCurrentSceneEventId) return;
+				if (event->Id == UpdateAllGameObjectsEventTypeEventId) return;
+				if (event->Id == UpdateProcessesEventId) return;
+				if (event->Id == ControllerMoveEventId) return;
+
+				// Generate causality data
+				// libcausality::EventTap::Get()->Tap(event, const_cast<IEventSubscriber*>(subscriber)->GetSubscriberName(), GameDataManager::Get()->GameWorldData.ElapsedGameTime);
+			});
+	}
+}
+
+int main(int, char* [])
+{
+	try
+	{
+		// Load settings file
+		if (!SettingsManager::Get()->ReadSettingsFile("data/settings.xml"))
 		{
-			// Drawing function
-			std::cout << "d";
-		}, 
-		[](unsigned long deltaMs) 
-		{
-			// Handle input function
-			std::cout << "i" << deltaMs << " ms\n";
-		});
+			char cwd[1024];
+			if (_getcwd(cwd, sizeof(cwd)) != nullptr)
+			{
+				std::cout << "Current working directory: " << cwd << "\n";
+			}
+			else
+			{
+				std::cout << "Failed to get current working directory.\n";
+			}
+			THROW(1, "Could not load settings file", "Settings");
+		}
 
-	gamelib::GameStructure gameStructure(fixedStepGameLoop);
-	//gameStructure.Initialize(800, 600, "Test Game", "data\\Resources.xml", "data\\");
-	gamelib::GameWorldData gameWorldData;
-	gameStructure.DoGameLoop(&gameWorldData);
+		// Initialize the game structure
+		GameStructure infrastructure(CreateGameLoopStrategy());
 
+		// Initialize all game subsystems
+		InitializeGameSubSystems(infrastructure);
 
+		// Allow tapping into all events diagnostic purposes
+		SetupEventTap();
 
-	gameStructure.Unload();
+		// Load level and create/add game objects
+		PrepareFirstLevel();
 
-	
+		// Start the game loop.
+		// This will pump update/draw events onto the event system, which level objects subscribe to
+		infrastructure.DoGameLoop(&mazer::GameDataManager::Get()->GameWorldData);
 
+		// Game is finished, unload subsystems
+
+		auto isUnloaded = infrastructure.Unload();
+
+		return IsSuccess(isUnloaded, "Unloading game subsystems successful.");
+	}
+	catch (const EngineException& e)
+	{
+		//MessageBoxA(nullptr, e.what(), "Game Error!", MB_OK);
+
+		ErrorLogManager::GetErrorLogManager()->Buffer << "****ERROR****\n";
+		ErrorLogManager::GetErrorLogManager()->Flush();
+		ErrorLogManager::GetErrorLogManager()->LogException(e);
+		ErrorLogManager::GetErrorLogManager()->Buffer << "*************\n";
+		ErrorLogManager::GetErrorLogManager()->Flush();
+	}
 	return 0;
 }

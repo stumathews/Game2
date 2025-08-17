@@ -20,7 +20,7 @@ find_package(SDL2_mixer REQUIRED)
 find_package(SDL2_image REQUIRED)
 find_package(mazer REQUIRED)
 
-add_executable(testLinking main.cpp)
+add_executable(testLinking main.cpp GameCommands.cpp InputManager.cpp LevelManager.cpp)
 
 target_link_libraries(testLinking 
 PUBLIC 
