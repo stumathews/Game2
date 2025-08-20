@@ -45,3 +45,9 @@ add_custom_command(
           "${CMAKE_CURRENT_SOURCE_DIR}/testdata/"
           "$<TARGET_FILE_DIR:testLinking>"
 )
+add_custom_command(
+  TARGET testLinking POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_CURRENT_SOURCE_DIR}/data/"
+          "$<TARGET_FILE_DIR:testLinking>"
+)

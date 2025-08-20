@@ -184,8 +184,9 @@ int main(int, char* [])
 			else
 			{
 				std::cout << "Failed to get current working directory.\n";
+
+				THROW(1, "Could not load settings file", "Settings");
 			}
-			THROW(1, "Could not load settings file", "Settings");
 		}
 
 		// Initialize the game structure
@@ -213,7 +214,7 @@ int main(int, char* [])
 	catch (const EngineException& e)
 	{
 		//MessageBoxA(nullptr, e.what(), "Game Error!", MB_OK);
-
+		std::cout << "Game Error: " << e.what() << "\n";
 		ErrorLogManager::GetErrorLogManager()->Buffer << "****ERROR****\n";
 		ErrorLogManager::GetErrorLogManager()->Flush();
 		ErrorLogManager::GetErrorLogManager()->LogException(e);
