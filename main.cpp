@@ -143,6 +143,7 @@ namespace
 
 	shared_ptr<FixedStepGameLoop> CreateGameLoopStrategy()
 	{
+		// Create a fixed step game loop with a update timestep of 16ms (approx 60fps). Use our update/draw functions
 		return std::make_shared<FixedStepGameLoop>(16, Update, Draw, GetInput);
 	}
 
