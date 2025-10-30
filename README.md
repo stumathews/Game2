@@ -1,8 +1,8 @@
 # Game2
 
-This is an example of a building a simple game called Game2.
+This is an example of a building a simple game that is built using CppGameLib.
 
-The game is comprised of the following files:
+The game (called Game2) is comprised of the following files:
 
 * main.cpp 
 * GameCommands.cpp 
@@ -11,11 +11,15 @@ The game is comprised of the following files:
 
 The game is built on a foundation of existing functionality provided by primarily the CppGameLib library which provides standard gaming functionality such:
 
-* A game loop
-* Resource/asset management
-* Event management
-* Networking
-* more
+* Settings (SettingsManager)
+* Resource/asset management (ResourceManager)
+* Event management (EventManager)
+* Networking (NetworkManager)
+* Game loop etc..
+
+The components provided by CppGameLib and how the interact with a game (such as Game2) is shown in the following diagram:
+
+![Simple game simulation architecture](CppGameLibSimulationArchitecture.png)
 
 In addition to CppGameLib, the game uses a game-specific library called Mazer which houses most of the game specific code such as the game characters, Level information etc. 
 
@@ -28,15 +32,17 @@ infrastructure.DoGameLoop(&mazer::GameDataManager::Get()->GameWorldData);
 
 Other game specific code constructs such as Enemy classes are provided by Mazer, however new games might build all their code within the game itself and not call upon external libraries. Mazer however provides a lot of characters and game objects that are ready to use.
 
+### Dependencies
+
 The CppGameLib library depends on functionality provided by other libraries:
 
-* SDL2
-* SDL2_ttf
-* SDL2_mixer
-* SDL2_image
-* Sodium
+* SDL2 - For 2D drawing and controller input
+* SDL2_ttf - Font loading 
+* SDL2_mixer - Sound
+* SDL2_image - Image/sprite loading
+* Sodium - Networking encryption
 
-The game build process ensures that these, CppGameLib and Mazer libraries are fetched, built and otherwise made available to the game during build/link time.
+The game build process ensures that the above dependencies, CppGameLib and Mazer are fetched, built and otherwise made available to the game during build/link time.
 
 # Getting started
 
@@ -78,6 +84,44 @@ To run the game, run the game's executable:
 ```
 build/game2.exe
 ```
+
+# Structure of the file in Game2
+
+* vcpkg.json
+
+This contains the dependencies that vcpkg will attempt to find and build/install. The file looks like this:
+
+```
+{
+  "dependencies": [
+    "libmonad",
+    "cppgamelib",
+    "testlib",
+    "mazer",
+    "libsodium",
+    "gtest",
+    "sdl2",
+    "sdl2-ttf",
+    "sdl2-mixer",
+    "sdl2-image"
+  ]
+}
+
+```
+
+* makelists.txt
+
+This contains the reference to the game's source code and its dependencies (which should have been made available by running `vcpkg install`)
+
+* CMakePresets.json
+
+This holds information to generate the games project files (Visual Studio). It also specifies that these files should be put in a folder called 'build'. Additionally, this contains the integration between Vcpkg and CMake via the CMAKE_TOOLCHAIN_FILE variable. 
+
+* vcpkg-configuration.json
+
+Sets the repository locations where dependencies are pulled from. This is currently https://github.com/stumathews/vcpkg-registry. When new changes are makde to CppGameLib, Mazer etc, new versions of these dependencies are published here such that vcpkg can pull them down and build them. Each dependency has build information that describes how to build itself and make itself available to cmake.
+
+
 
 
 
