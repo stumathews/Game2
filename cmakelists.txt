@@ -20,9 +20,9 @@ find_package(SDL2_mixer REQUIRED)
 find_package(SDL2_image REQUIRED)
 find_package(mazer REQUIRED)
 
-add_executable(testLinking main.cpp GameCommands.cpp InputManager.cpp LevelManager.cpp)
+add_executable(game2 main.cpp GameCommands.cpp InputManager.cpp LevelManager.cpp)
 
-target_link_libraries(testLinking 
+target_link_libraries(game2 
 PUBLIC 
 SDL2::SDL2main
 SDL2_ttf::SDL2_ttf
@@ -38,16 +38,16 @@ ws2_32
 testlib::testlib 
 )
 
-# Copy test files in the output folder of the testLinking target
+# Copy test files in the output folder of the game2 target
 add_custom_command(
-  TARGET testLinking POST_BUILD
+  TARGET game2 POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_CURRENT_SOURCE_DIR}/testdata/"
-          "$<TARGET_FILE_DIR:testLinking>"
+          "$<TARGET_FILE_DIR:game2>"
 )
 add_custom_command(
-  TARGET testLinking POST_BUILD
+  TARGET game2 POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_CURRENT_SOURCE_DIR}/data/"
-          "$<TARGET_FILE_DIR:testLinking>"
+          "$<TARGET_FILE_DIR:game2>"
 )
